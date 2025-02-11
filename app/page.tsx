@@ -106,7 +106,7 @@ const Halftoner = () => {
     factor: number
   ) => {
     const length = dotSize * factor;
-    if (length > 1) {
+    if (length > 0.5) {
       ctx.beginPath();
       ctx.moveTo(cx - length / 2, cy);
       ctx.lineTo(cx + length / 2, cy);
@@ -124,7 +124,7 @@ const Halftoner = () => {
     factor: number
   ) => {
     const length = dotSize * factor;
-    if (length > 1) {
+    if (length > 0.5) {
       ctx.beginPath();
       ctx.moveTo(cx - length / 2, cy);
       ctx.lineTo(cx + length / 2, cy);
@@ -152,7 +152,6 @@ const Halftoner = () => {
     cross: drawCross,
   };
 
-  // biome-ignore lint/correctness/useExhaustiveDependencies: <explanation>
   useEffect(() => {
     if (!image || !canvasRef.current) return;
     const canvas = canvasRef.current;
@@ -175,8 +174,10 @@ const Halftoner = () => {
         const r = imageData.data[i];
         const g = imageData.data[i + 1];
         const b = imageData.data[i + 2];
-        const brightness = (r + g + b) / 3;
-        const factor = 1 - brightness / 255;
+
+        const brightness = Math.max(0, (r + g + b) / 3 - 30);
+        const factor = 1 - (brightness / 255) * 0.8;
+
         const cx = x + dotSize / 2;
         const cy = y + dotSize / 2;
 
