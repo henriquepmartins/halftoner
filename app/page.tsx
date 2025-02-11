@@ -47,6 +47,25 @@ const Halftoner = () => {
     link.click();
   };
 
+  const adjustBrightness = (brightness: number, pattern: string): number => {
+    const normalizedBrightness = brightness / 255;
+
+    switch (pattern) {
+      case "dot":
+        return normalizedBrightness ** 1.2 * 0.85;
+      case "square":
+        return normalizedBrightness ** 1.1 * 0.9;
+      case "triangle":
+        return normalizedBrightness ** 0.9 * 0.85;
+      case "line":
+        return normalizedBrightness ** 1.3 * 0.8;
+      case "cross":
+        return normalizedBrightness ** 1.1 * 0.75;
+      default:
+        return normalizedBrightness;
+    }
+  };
+
   const drawDot = (
     ctx: CanvasRenderingContext2D,
     cx: number,
@@ -59,7 +78,10 @@ const Halftoner = () => {
       ctx.beginPath();
       ctx.arc(cx, cy, radius, 0, 2 * Math.PI);
       ctx.fillStyle = "black";
+      // Add subtle edge softening for dots
+      ctx.globalAlpha = Math.min(1, factor + 0.1);
       ctx.fill();
+      ctx.globalAlpha = 1;
     }
   };
 
@@ -73,8 +95,14 @@ const Halftoner = () => {
     const size = dotSize * factor;
     if (size > 0.5) {
       const half = size / 2;
+      // Rotate squares slightly based on brightness
+      const rotation = (factor * Math.PI) / 8;
+      ctx.save();
+      ctx.translate(cx, cy);
+      ctx.rotate(rotation);
       ctx.fillStyle = "black";
-      ctx.fillRect(cx - half, cy - half, size, size);
+      ctx.fillRect(-half, -half, size, size);
+      ctx.restore();
     }
   };
 
@@ -88,13 +116,19 @@ const Halftoner = () => {
     const size = dotSize * factor;
     if (size > 0.5) {
       const height = (size * Math.sqrt(3)) / 2;
+      // Rotate triangles based on position for more organic feel
+      const rotation = (cx + cy) * 0.01;
+      ctx.save();
+      ctx.translate(cx, cy);
+      ctx.rotate(rotation);
       ctx.beginPath();
-      ctx.moveTo(cx, cy - (2 / 3) * height);
-      ctx.lineTo(cx - size / 2, cy + (1 / 3) * height);
-      ctx.lineTo(cx + size / 2, cy + (1 / 3) * height);
+      ctx.moveTo(0, -height * (2 / 3));
+      ctx.lineTo(-size / 2, height / 3);
+      ctx.lineTo(size / 2, height / 3);
       ctx.closePath();
       ctx.fillStyle = "black";
       ctx.fill();
+      ctx.restore();
     }
   };
 
@@ -107,12 +141,18 @@ const Halftoner = () => {
   ) => {
     const length = dotSize * factor;
     if (length > 0.5) {
+      // Calculate angle based on local brightness gradient
+      const angle = (cx + cy) * 0.05;
+      ctx.save();
+      ctx.translate(cx, cy);
+      ctx.rotate(angle);
       ctx.beginPath();
-      ctx.moveTo(cx - length / 2, cy);
-      ctx.lineTo(cx + length / 2, cy);
+      ctx.moveTo(-length / 2, 0);
+      ctx.lineTo(length / 2, 0);
       ctx.strokeStyle = "black";
-      ctx.lineWidth = 2;
+      ctx.lineWidth = Math.max(1, factor * 2);
       ctx.stroke();
+      ctx.restore();
     }
   };
 
@@ -125,14 +165,20 @@ const Halftoner = () => {
   ) => {
     const length = dotSize * factor;
     if (length > 0.5) {
+      // Add slight rotation for more dynamic feel
+      const rotation = (factor * Math.PI) / 12;
+      ctx.save();
+      ctx.translate(cx, cy);
+      ctx.rotate(rotation);
       ctx.beginPath();
-      ctx.moveTo(cx - length / 2, cy);
-      ctx.lineTo(cx + length / 2, cy);
-      ctx.moveTo(cx, cy - length / 2);
-      ctx.lineTo(cx, cy + length / 2);
+      ctx.moveTo(-length / 2, 0);
+      ctx.lineTo(length / 2, 0);
+      ctx.moveTo(0, -length / 2);
+      ctx.lineTo(0, length / 2);
       ctx.strokeStyle = "black";
-      ctx.lineWidth = 2;
+      ctx.lineWidth = Math.max(1, factor * 1.5);
       ctx.stroke();
+      ctx.restore();
     }
   };
 
@@ -152,6 +198,7 @@ const Halftoner = () => {
     cross: drawCross,
   };
 
+  // biome-ignore lint/correctness/useExhaustiveDependencies: <explanation>
   useEffect(() => {
     if (!image || !canvasRef.current) return;
     const canvas = canvasRef.current;
@@ -168,6 +215,10 @@ const Halftoner = () => {
     ctx.fillStyle = "white";
     ctx.fillRect(0, 0, canvas.width, canvas.height);
 
+    if (ctx.imageSmoothingEnabled) {
+      ctx.imageSmoothingQuality = "high";
+    }
+
     for (let y = 0; y < image.height; y += dotSize) {
       for (let x = 0; x < image.width; x += dotSize) {
         const i = (y * image.width + x) * 4;
@@ -175,8 +226,12 @@ const Halftoner = () => {
         const g = imageData.data[i + 1];
         const b = imageData.data[i + 2];
 
-        const brightness = Math.max(0, (r + g + b) / 3 - 30);
-        const factor = 1 - (brightness / 255) * 0.8;
+        const brightness = (r + g + b) / 3;
+        const adjustedBrightness = adjustBrightness(
+          brightness,
+          selectedPattern
+        );
+        const factor = 1 - adjustedBrightness;
 
         const cx = x + dotSize / 2;
         const cy = y + dotSize / 2;
